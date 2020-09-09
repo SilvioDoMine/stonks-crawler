@@ -175,11 +175,3 @@ function askQuestion(query) {
         resolve(ans);
     }))
 }
-
-// async function initialLogin() {
-//     let input = await document.getElementById('loginv20170605');
-//     input.value = login;
-
-//     let advanceLoginButton = await document.getElementsByClassName("topo10 bottom10")[0];
-//     await advanceLoginButton.click();
-// }
