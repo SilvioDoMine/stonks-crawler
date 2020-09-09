@@ -19,7 +19,7 @@ setInterval(function(){
         if (target._targetInfo.url == "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx") {
            let brokerPage = await target.page();
 
-           setInterval((stocks) => {
+           setInterval(() => {
                 brokerPage.evaluate(function(){
                     let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
                     rows.forEach(function(row){
@@ -38,9 +38,9 @@ setInterval(function(){
                         console.log(object);
                     });
                 });
-           }, stocks, 1000);
+           }, 1000);
         }
-    }, stocks);
+    });
 
     const page = await browser.newPage();
 
