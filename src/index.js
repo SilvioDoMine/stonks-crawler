@@ -1,5 +1,12 @@
 const readline = require('readline');
 const pupperteer = require('puppeteer');
+var stocks = {};
+
+setInterval(function(){
+    if (stocks.length > 0) {
+        console.log(stocks);
+    }
+}, 5000);
 
 (async function () {
     // Browser Initiate
@@ -7,6 +14,33 @@ const pupperteer = require('puppeteer');
         headless: false,
         //slowMo: 250,
     });
+
+    browser.on('targetcreated', async function(target) {
+        if (target._targetInfo.url == "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx") {
+           let brokerPage = await target.page();
+
+           setInterval((stocks) => {
+                brokerPage.evaluate(function(){
+                    let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
+                    rows.forEach(function(row){
+                        let object = {
+                            papel: row.childNodes[1].innerText,
+                            ultima: row.childNodes[3].innerText,
+                            variacao: row.childNodes[4].innerText,
+                            abertura: row.childNodes[5].innerText,
+                            minima: row.childNodes[6].innerText,
+                            maxima: row.childNodes[7].innerText,
+                            fechamento: row.childNodes[8].innerText,
+                            volume: row.childNodes[9].innerText,
+                            preco_teorico: row.childNodes[12].innerText,
+                        };
+
+                        console.log(object);
+                    });
+                });
+           }, stocks, 1000);
+        }
+    }, stocks);
 
     const page = await browser.newPage();
 
@@ -34,11 +68,9 @@ const pupperteer = require('puppeteer');
         let letter = password[i];
 
         if (letter != letter.toUpperCase()) {
-            console.log(`m: ${letter}`);
             await page.waitForSelector(`input[title='${letter}']`);
             await page.evaluate((letter) => document.querySelector(`input[title='${letter}']`).click(), letter);
         } else {
-            console.log(`M: ${letter}`);
             await page.evaluate(() => document.getElementById("j_idt65:8:j_idt67").click());
 
             await page.waitForSelector(`input[title='${letter}']`);
@@ -78,13 +110,14 @@ const pupperteer = require('puppeteer');
 
     await page.waitForNavigation();
 
-    const newPagePromise = new Promise(x => browser.once('targetdestroyed', target => x(target.page())));
-    const popup = await newPagePromise;
-    console.log(popup.url());
+    await page.goto("https://internetbanking.bancointer.com.br/idtvm/homeBroker.jsf", { waitUntil: 'networkidle0' });
 
-    await page.goto("https://internetbanking.bancointer.com.br/homeBroker", { waitUntil: 'networkidle0' });
-    
-    await page.waitForNavigation();
+    await page.waitForSelector("#btnHomeBroker", { waitUntil: 'networkidle0' });
+    await page.evaluate(() => document.getElementById("btnHomeBroker").click());
+
+    let targets = [];
+    let resolve;
+
 })();
 
 function askQuestion(query) {
