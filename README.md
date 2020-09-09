@@ -1,0 +1,3 @@
+# stonks-crawler
+
+npm install
