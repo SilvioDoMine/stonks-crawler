@@ -20,6 +20,109 @@ const pupperteer = require('puppeteer');
         //slowMo: 250,
     });
 
+    // Abre uma nova página no Browser
+    const page = await browser.newPage();
+
+    // Seta tempo de expiração (Timeout) infinito para esta página.
+    await page.setDefaultNavigationTimeout(0);
+
+    // Na página previamente aberta, acessa a rota de login e espera carregar até o fim
+    await page.goto("https://internetbanking.bancointer.com.br/login.jsf", { waitUntil: 'networkidle0' }); 
+
+    // Dentro da página de Login, vamos executar o seguinte código:
+    await page.evaluate(function(){
+        // Seta o campo de login para a minha conta pessoal.
+        document.getElementById('loginv20170605').value = "3861518-5";
+        // Clica no botão de login.
+        document.getElementsByClassName("topo10 bottom10")[0].click();
+    });
+
+    // Agora que clicamos em login, a página vai recarregar. Mas, para prosseguir
+    // precisamos que a página já tenha concluído o carregamento, então vamos pedir
+    // pro puppeteer esperar.
+    await page.waitForNavigation();
+
+    // Agora ele redirecionou para uma página que tem o nome do usuário.
+    // Vamos navegar no DOM e executar o seguinte código:
+    await page.evaluate(function(){
+        // Procure o botão que está escrito as iniciais do usuário, e clique nele.
+        document.getElementById("j_idt159").click();
+    });
+
+    // Agora deve ter aberto um teclado digital para o usuário digitar a sua senha.
+    // Para ser mais seguro, vamos pedir pro usuário digitar a senha no NodeJS.
+    let password = await askQuestion("Please, type your password: ");
+
+    // Agora vamos varrer cada letra da senha digitada, e simular um click
+    // no teclado virtual do Banco Inter.
+    for (var i = 0; i < password.length; i++) {
+        let letter = password[i];
+
+        if (letter != letter.toUpperCase()) {
+            await page.waitForSelector(`input[title='${letter}']`);
+            await page.evaluate((letter) => document.querySelector(`input[title='${letter}']`).click(), letter);
+        } else {
+            await page.evaluate(() => document.getElementById("j_idt65:8:j_idt67").click());
+
+            await page.waitForSelector(`input[title='${letter}']`);
+            await page.evaluate((letter) => document.querySelector(`input[title='${letter}']`).click(), letter);
+
+            await page.evaluate(() => document.getElementById("j_idt65:8:j_idt67").click());
+        }
+    }
+
+    // Agora com a senha digitada, vamos fazer um workarround para
+    // esperar o campo de CONTINUAR não estar mais disabled. 
+    // É necessário esse workarround pois o puppeteer não tem funções
+    // para elementos que estão DISABLED. Apenas HIDDEN.
+    let found = false;
+    while(found == false) {
+
+        let response = await page.evaluate(() => {
+            let isDisabled = document.getElementById("j_idt51").disabled;
+
+            return {
+                isDisabled
+            }
+        });
+
+        if (response.isDisabled == false) {
+            found = true;
+        }
+    }
+
+    // Agora vamos clicar em Continuar, pois a senha foi inserida corretamente.
+    await page.evaluate(() => document.getElementById("j_idt51").click());
+
+    // Agora que a senha foi digitada com sucesso, nós precisamos do código de autenticação
+    // de dois fatores. Vamos pedir pro cliente informar isto.
+    let factorPass = await askQuestion("Please, type your two factor authentication code: ");
+
+    // Após o cliente ter passado, vamos esperar a página de autenticação de dois fatores aparecer...
+    await page.waitForSelector("#codigoAutorizacaoAOTP");
+
+    // Agora que apareceu, vamos executar a seguinte função:
+    await page.evaluate((factorPass) => {
+        // Digita o valor do código de autenticação no input correto
+        document.getElementById("codigoAutorizacaoAOTP").value = factorPass;
+        // Clica para logar na plataforma
+        document.getElementById("confirmarCodigoTransacaoAOTP").click();
+    }, factorPass);
+
+    // Precisamos aguardar o usuário logar e a página carregar normalmente.
+    await page.waitForNavigation();
+
+    // Agora que a página carregou, e o usuário está logado... vamos
+    // redirecionar ele para a página do Homebroker
+    await page.goto("https://internetbanking.bancointer.com.br/idtvm/homeBroker.jsf", { waitUntil: 'networkidle0' });
+
+    // Assim que a gente redirecionar ele para a página do homebroker, vamos esperar
+    // ela carregar e aparecer o link para abrir o homebroker.
+    await page.waitForSelector("#btnHomeBroker", { waitUntil: 'networkidle0' });
+    
+    // Agora que apareceu, vamos clicar no botão para abrir o Homebroker em uma nova janela.
+    await page.evaluate(() => document.getElementById("btnHomeBroker").click());
+
     // Quando uma nova janela abrir, vamos executar essa função
     // NOTA: Isso precisa existir pois o Banco Inter abre uma nova
     // janela pra abrir o Homebroker. Pegaremos essa tela por aqui!
@@ -85,82 +188,6 @@ const pupperteer = require('puppeteer');
 
         }, 1000);
     });
-
-    const page = await browser.newPage();
-
-    // Fetch page and wait it's load.
-    await page.goto("https://internetbanking.bancointer.com.br/login.jsf", { waitUntil: 'networkidle0' });
-
-    await page.setDefaultNavigationTimeout(0); 
-
-    // Execute javascript inside the page
-    await page.evaluate(function(){
-        document.getElementById('loginv20170605').value = "3861518-5";
-
-        document.getElementsByClassName("topo10 bottom10")[0].click();
-    });
-
-    await page.waitForNavigation();
-
-    await page.evaluate(function(){
-        document.getElementById("j_idt159").click();
-    });
-
-    let password = await askQuestion("Please, type your password: ");
-
-    for (var i = 0; i < password.length; i++) {
-        let letter = password[i];
-
-        if (letter != letter.toUpperCase()) {
-            await page.waitForSelector(`input[title='${letter}']`);
-            await page.evaluate((letter) => document.querySelector(`input[title='${letter}']`).click(), letter);
-        } else {
-            await page.evaluate(() => document.getElementById("j_idt65:8:j_idt67").click());
-
-            await page.waitForSelector(`input[title='${letter}']`);
-            await page.evaluate((letter) => document.querySelector(`input[title='${letter}']`).click(), letter);
-
-            await page.evaluate(() => document.getElementById("j_idt65:8:j_idt67").click());
-        }
-    }
-
-    let found = false;
-    while(found == false) {
-
-        let response = await page.evaluate(() => {
-            let isDisabled = document.getElementById("j_idt51").disabled;
-
-            return {
-                isDisabled
-            }
-        });
-
-        if (response.isDisabled == false) {
-            found = true;
-        }
-    }
-
-    await page.evaluate(() => document.getElementById("j_idt51").click());
-
-    let factorPass = await askQuestion("Please, type your two factor authentication code: ");
-
-    await page.waitForSelector("#codigoAutorizacaoAOTP");
-
-    await page.evaluate((factorPass) => {
-        document.getElementById("codigoAutorizacaoAOTP").value = factorPass;
-
-        document.getElementById("confirmarCodigoTransacaoAOTP").click();
-    }, factorPass);
-
-    await page.waitForNavigation();
-
-    await page.goto("https://internetbanking.bancointer.com.br/idtvm/homeBroker.jsf", { waitUntil: 'networkidle0' });
-
-    await page.waitForSelector("#btnHomeBroker", { waitUntil: 'networkidle0' });
-    await page.evaluate(() => document.getElementById("btnHomeBroker").click());
-
-    let targets = [];
-    let resolve;
 
 })();
 
