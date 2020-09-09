@@ -3,40 +3,61 @@ const pupperteer = require('puppeteer');
 
 (async () => {
 
+    // Lista global de ações, que o NodeJS tem acesso
     let stocks = {};
 
+    // Função que futuramente salvará as ações.
     setInterval(() => {
         if (Object.keys(stocks).length) {
             console.log(stocks);
         }
     }, 1000);
 
-    // Browser Initiate
+    // Inicia o Browser
     const browser = await pupperteer.launch({
-        headless: false,
+        // Debug Session
+        //headless: false,
         //slowMo: 250,
     });
 
-    
-
+    // Quando uma nova janela abrir, vamos executar essa função
+    // NOTA: Isso precisa existir pois o Banco Inter abre uma nova
+    // janela pra abrir o Homebroker. Pegaremos essa tela por aqui!
     browser.on('targetcreated', async function(target) {
 
-        if (target._targetInfo.url == "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx") {
-           let brokerPage = await target.page();
+        const homebrokerUrl = "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx";
 
-            await brokerPage.waitFor(3000);
+        // Se não for a tela do homebroker, vaza dessa função!
+        if (target._targetInfo.url =! homebrokerUrl) {
+            return;
+        }
+        
+        // Vamos pegar a página em si, para trabalhar com ela.
+        let brokerPage = await target.page();
 
-            setInterval(async () => {
+        // Vamos esperar 3 segundos para prosseguir. Esse vai ser o tempo
+        // do homebroker carregar por completo.
+        await brokerPage.waitFor(3000);
 
-                let result = await brokerPage.evaluate((stocks) => {
+        // Agora com o homebroker carregado, vamos rodar essa função em LOOP!
+        setInterval(async () => {
+
+            // Vamos navegar no DOM do Homebroker e procurar uns valores.
+            let result = await brokerPage.evaluate((stocks) => {
 
                     let allStocks = {};
 
+                    // Vou procurar a lista de todas ações da carteira.
                     let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
-                    rows.forEach(function(row){
 
+                    // Para cada uma das ações, eu vou...
+                    rows.forEach(function(row){
+                        // ver os elementos da tabela
                         let elements = row.childNodes;
 
+                        // E montar um novo objeto com todos os dados.
+                        // NOTA: Estou inserindo esses dados para dentro
+                        // do objeto allStocks previamente criado, neste escopo.
                         allStocks[elements[1].innerText] = {
                             ultima: elements[3].innerText,
                             variacao: elements[4].innerText,
@@ -49,10 +70,17 @@ const pupperteer = require('puppeteer');
                         };
                     });
 
+                    // Simula um clique para evitar desconexão por inatividade
+                    document.getElementById("tdIcon_win_ct1").click();
+
+                    // Retorna um objeto com allStocks nele.
                     return { allStocks };
 
                 }, stocks);
 
+                // Agora eu pego o resultado da consulta no DOM acima, dentro
+                // do resultado eu vou pegar a propriedade allStocks e vou inserir
+                // o valor dentro do objeto global do NodeJS stocks.
                 stocks = result.allStocks;
 
            }, 1000);
