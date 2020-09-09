@@ -28,7 +28,7 @@ const pupperteer = require('puppeteer');
         const homebrokerUrl = "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx";
 
         // Se não for a tela do homebroker, vaza dessa função!
-        if (target._targetInfo.url =! homebrokerUrl) {
+        if (target._targetInfo.url != homebrokerUrl) {
             return;
         }
         
@@ -83,8 +83,7 @@ const pupperteer = require('puppeteer');
                 // o valor dentro do objeto global do NodeJS stocks.
                 stocks = result.allStocks;
 
-           }, 1000);
-        }
+        }, 1000);
     });
 
     const page = await browser.newPage();
