@@ -1,43 +1,60 @@
 const readline = require('readline');
 const pupperteer = require('puppeteer');
-var stocks = {};
 
-setInterval(function(){
-    if (stocks.length > 0) {
-        console.log(stocks);
-    }
-}, 5000);
+(async () => {
 
-(async function () {
+    let stocks = {};
+
+    setInterval(() => {
+        if (Object.keys(stocks).length) {
+            console.log(stocks);
+        }
+    }, 1000);
+
     // Browser Initiate
     const browser = await pupperteer.launch({
         headless: false,
         //slowMo: 250,
     });
 
+    
+
     browser.on('targetcreated', async function(target) {
+
         if (target._targetInfo.url == "https://home-broker.bancointer.com.br/hbnet2/hbweb2/Default.aspx") {
            let brokerPage = await target.page();
 
-           setInterval(() => {
-                brokerPage.evaluate(function(){
+            await brokerPage.waitFor(3000);
+
+            setInterval(async () => {
+
+                let result = await brokerPage.evaluate((stocks) => {
+
+                    let allStocks = {};
+
                     let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
                     rows.forEach(function(row){
-                        let object = {
-                            papel: row.childNodes[1].innerText,
-                            ultima: row.childNodes[3].innerText,
-                            variacao: row.childNodes[4].innerText,
-                            abertura: row.childNodes[5].innerText,
-                            minima: row.childNodes[6].innerText,
-                            maxima: row.childNodes[7].innerText,
-                            fechamento: row.childNodes[8].innerText,
-                            volume: row.childNodes[9].innerText,
-                            preco_teorico: row.childNodes[12].innerText,
-                        };
 
-                        console.log(object);
+                        let elements = row.childNodes;
+
+                        allStocks[elements[1].innerText] = {
+                            ultima: elements[3].innerText,
+                            variacao: elements[4].innerText,
+                            abertura: elements[5].innerText,
+                            minima: elements[6].innerText,
+                            maxima: elements[7].innerText,
+                            fechamento: elements[8].innerText,
+                            volume: elements[9].innerText,
+                            preco_teorico: elements[12].innerText,
+                        };
                     });
-                });
+
+                    return { allStocks };
+
+                }, stocks);
+
+                stocks = result.allStocks;
+
            }, 1000);
         }
     });
