@@ -1,5 +1,23 @@
 const readline = require('readline');
 const pupperteer = require('puppeteer');
+const mysql = require('mysql');
+let userStocks = [];
+
+/**
+ * MySQL functions
+ */
+const connection = mysql.createConnection({
+    host: '127.0.0.1',
+    user: 'silvio',
+    password: 'tz9514Kk',
+    database: 'stonks',
+});
+
+connection.connect(error => {
+    if (error) {
+        throw error;
+    }
+});
 
 (async () => {
 
@@ -8,6 +26,10 @@ const pupperteer = require('puppeteer');
 
     // Função que futuramente salvará as ações.
     setInterval(() => {
+
+        // Função que atualiza todas as ações
+        getAllStocks();
+
         if (Object.keys(stocks).length) {
             console.log(stocks);
         }
@@ -16,7 +38,7 @@ const pupperteer = require('puppeteer');
     // Inicia o Browser
     const browser = await pupperteer.launch({
         // Debug Session
-        //headless: false,
+        headless: false,
         //slowMo: 250,
     });
 
@@ -146,7 +168,7 @@ const pupperteer = require('puppeteer');
         setInterval(async () => {
 
             // Vamos navegar no DOM do Homebroker e procurar uns valores.
-            let result = await brokerPage.evaluate((stocks) => {
+            let result = await brokerPage.evaluate((userStocks) => {
 
                     let allStocks = {};
 
@@ -158,10 +180,17 @@ const pupperteer = require('puppeteer');
                         // ver os elementos da tabela
                         let elements = row.childNodes;
 
+                        // Dados em string para facilitar leitura.
+                        let stockName = elements[1].innerText;
+
+                        if (!userStocks.includes(stockName)) {
+                            return;
+                        }
+
                         // E montar um novo objeto com todos os dados.
                         // NOTA: Estou inserindo esses dados para dentro
                         // do objeto allStocks previamente criado, neste escopo.
-                        allStocks[elements[1].innerText] = {
+                        allStocks[stockName] = {
                             ultima: elements[3].innerText,
                             variacao: elements[4].innerText,
                             abertura: elements[5].innerText,
@@ -179,7 +208,7 @@ const pupperteer = require('puppeteer');
                     // Retorna um objeto com allStocks nele.
                     return { allStocks };
 
-                }, stocks);
+                }, userStocks);
 
                 // Agora eu pego o resultado da consulta no DOM acima, dentro
                 // do resultado eu vou pegar a propriedade allStocks e vou inserir
@@ -191,6 +220,7 @@ const pupperteer = require('puppeteer');
 
 })();
 
+
 function askQuestion(query) {
     const rl = readline.createInterface({
         input: process.stdin,
@@ -201,4 +231,29 @@ function askQuestion(query) {
         rl.close();
         resolve(ans);
     }))
+}
+
+/**
+ * Crawler 
+ */
+function getAllStocks()
+{
+    let sql = "SELECT code FROM stock_data";
+
+    let allStocks = connection.query(sql, function(err, results) {
+        if (err) {
+            throw err;
+        }
+
+        userStocks = [];
+
+        results.forEach(function(item){
+            
+            let contains = userStocks.includes(item.code);
+
+            if (!contains) {
+                userStocks.push(item.code);
+            }
+        });
+    });
 }
