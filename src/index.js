@@ -8,8 +8,8 @@ let userStocks = [];
  */
 const connection = mysql.createConnection({
     host: '127.0.0.1',
-    user: 'silvio',
-    password: 'tz9514Kk',
+    user: 'root',
+    password: 'root',
     database: 'stonks',
 });
 
@@ -169,6 +169,29 @@ connection.connect(error => {
 
             // Vamos navegar no DOM do Homebroker e procurar uns valores.
             let result = await brokerPage.evaluate((userStocks) => {
+
+                    // BARRINHA DE CIMA (Table): tabToolBar-ct1
+                    //     LISTA DE CARTEIRA (Select): cboCarteira-ct1
+                    //     INCLUIR CARTEIRA (Input): txtCarteira-ct1
+                    //     INCLUIR PAPEL (Input): txtPapel-ct1
+                    //     INCLUIR PAPEL (Button): incPapel-ct1
+
+                    // =============
+                    //  Find Stocks
+                    // =============
+
+                    userStocks.forEach((stock) => {
+
+                        let allPortfilios = document.querySelectorAll("#cboCarteira-ct1 option");
+
+                        for (let i = 0; i < allPortfilios.length; i++) {
+                            
+                        }
+
+                    });
+
+
+                    /////////////////////////////////
 
                     let allStocks = {};
 
