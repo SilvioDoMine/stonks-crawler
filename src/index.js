@@ -11,8 +11,8 @@ let stocks = {};
  */
 const connection = mysql.createConnection({
     host: '127.0.0.1',
-    user: 'root',
-    password: 'root',
+    user: 'silvio',
+    password: 'tz9514Kk',
     database: 'stonks',
 });
 
@@ -366,6 +366,8 @@ async function crawlerLoop(page) {
         console.log(`===================================`);
     }
 
+    updateAllStocks();
+
     await page.waitFor(15000);
 }
 
@@ -384,11 +386,29 @@ function askQuestion(query) {
 /**
  * Crawler 
  */
-function getAllStocks()
-{
+function updateAllStocks() {
+    let allStockToUpdate = stocks;
+
+    for (let i = 0; i < Object.keys(allStockToUpdate).length; i++) {
+
+        let stockName = Object.keys(allStockToUpdate)[i];
+        let thisStock = allStockToUpdate[stockName];
+        let stockJson = JSON.stringify(thisStock);
+        let sqlQuery = `UPDATE stock_data SET data = '${stockJson}' WHERE code = '${stockName}'`;
+
+        connection.query(sqlQuery, function(err, results){
+            if (err) {
+                throw err;
+            }
+        });
+    }
+}
+
+
+function getAllStocks() {
     let sql = "SELECT code FROM stock_data";
 
-    let allStocks = connection.query(sql, function(err, results) {
+    connection.query(sql, function(err, results) {
         if (err) {
             throw err;
         }
