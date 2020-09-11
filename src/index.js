@@ -1,7 +1,10 @@
 const readline = require('readline');
 const pupperteer = require('puppeteer');
 const mysql = require('mysql');
+const { exit } = require('process');
 let userStocks = [];
+// Lista global de ações, que o NodeJS tem acesso
+let stocks = {};
 
 /**
  * MySQL functions
@@ -21,9 +24,6 @@ connection.connect(error => {
 
 (async () => {
 
-    // Lista global de ações, que o NodeJS tem acesso
-    let stocks = {};
-
     // Função que futuramente salvará as ações.
     setInterval(() => {
 
@@ -31,7 +31,7 @@ connection.connect(error => {
         getAllStocks();
 
         if (Object.keys(stocks).length) {
-            console.log(stocks);
+            //console.log(stocks);
         }
     }, 1000);
 
@@ -164,84 +164,119 @@ connection.connect(error => {
         // do homebroker carregar por completo.
         await brokerPage.waitFor(3000);
 
-        // Agora com o homebroker carregado, vamos rodar essa função em LOOP!
-        setInterval(async () => {
+        while(true) {
+            await crawlerLoop(brokerPage);
+        }
 
-            // Vamos navegar no DOM do Homebroker e procurar uns valores.
-            let result = await brokerPage.evaluate((userStocks) => {
-
-                    // BARRINHA DE CIMA (Table): tabToolBar-ct1
-                    //     LISTA DE CARTEIRA (Select): cboCarteira-ct1
-                    //     INCLUIR CARTEIRA (Input): txtCarteira-ct1
-                    //     INCLUIR PAPEL (Input): txtPapel-ct1
-                    //     INCLUIR PAPEL (Button): incPapel-ct1
-
-                    // =============
-                    //  Find Stocks
-                    // =============
-
-                    userStocks.forEach((stock) => {
-
-                        let allPortfilios = document.querySelectorAll("#cboCarteira-ct1 option");
-
-                        for (let i = 0; i < allPortfilios.length; i++) {
-                            
-                        }
-
-                    });
-
-
-                    /////////////////////////////////
-
-                    let allStocks = {};
-
-                    // Vou procurar a lista de todas ações da carteira.
-                    let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
-
-                    // Para cada uma das ações, eu vou...
-                    rows.forEach(function(row){
-                        // ver os elementos da tabela
-                        let elements = row.childNodes;
-
-                        // Dados em string para facilitar leitura.
-                        let stockName = elements[1].innerText;
-
-                        if (!userStocks.includes(stockName)) {
-                            return;
-                        }
-
-                        // E montar um novo objeto com todos os dados.
-                        // NOTA: Estou inserindo esses dados para dentro
-                        // do objeto allStocks previamente criado, neste escopo.
-                        allStocks[stockName] = {
-                            ultima: elements[3].innerText,
-                            variacao: elements[4].innerText,
-                            abertura: elements[5].innerText,
-                            minima: elements[6].innerText,
-                            maxima: elements[7].innerText,
-                            fechamento: elements[8].innerText,
-                            volume: elements[9].innerText,
-                            preco_teorico: elements[12].innerText,
-                        };
-                    });
-
-                    // Simula um clique para evitar desconexão por inatividade
-                    document.getElementById("tdIcon_win_ct1").click();
-
-                    // Retorna um objeto com allStocks nele.
-                    return { allStocks };
-
-                }, userStocks);
-
-                // Agora eu pego o resultado da consulta no DOM acima, dentro
-                // do resultado eu vou pegar a propriedade allStocks e vou inserir
-                // o valor dentro do objeto global do NodeJS stocks.
-                stocks = result.allStocks;
-
-        }, 1000);
     });
 
 })();
+
+/**
+ * 
+ * @param {*} page Homebroker page
+ */
+async function crawlerLoop(page) {
+
+    console.log(`> --------------------------------------`);
+    console.log(`> Iniciando a leitura do homebroker.`);
+    console.log(`> --------------------------------------`);
+
+    let allStocksToCrawl = userStocks;
+
+    for (let i = 0; i < allStocksToCrawl.length; i++) {
+
+        let stockToCrawl = allStocksToCrawl[i];
+
+        console.log(`> Vamos tentar buscar o papel ${stockToCrawl} da ação ${i + 1}/${allStocksToCrawl.length}.`);
+
+        console.log(`> Vamos buscar a lista de carteiras disponíveis.`);
+        
+        let allPortfolios = await page.evaluate(() => {
+            let portfolios = document.querySelectorAll(`#cboCarteira-ct1 > option`);
+
+            let ids = [];
+
+            portfolios.forEach((portfolioNode) => ids.push(portfolioNode.id));
+
+            return { ids };
+        });
+
+        let portfolioIds = allPortfolios.ids;
+        let stockData = {};
+
+        console.log(`> Temos um total de ${portfolioIds.length} carteiras. Vamos varrer todas elas, até encontrar ação que nós queremos.`);
+
+        for (let j = 0; j < portfolioIds.length; j++) {
+            console.log(`> Vamos acessar a carteira ${j+1}/${portfolioIds.length}.`);
+
+            await page.evaluate((portfolioId) => {
+                console.log(portfolioId);
+                document.getElementById(portfolioId).selected = true;
+                document.getElementById(`cboCarteira-ct1`).dispatchEvent(new Event('change'));
+            }, portfolioIds[j]);
+
+            console.log(`> Esperando 2000ms para carregar os dados...`);
+            await page.waitFor(2000);
+
+            console.log(`> Vamos verificar se essa carteira (${j+1} de ${portfolioIds.length}) tem o papel ${stockToCrawl}.`);
+
+            let findStock = await page.evaluate((stockToCrawl) => {
+
+                let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
+
+                let thisStock = {};
+
+                for (let k = 0; k < rows.length; k++) {
+                    let elements = rows[k].childNodes;
+
+                    // Dados em string para facilitar leitura.
+                    let stockName = elements[1].innerText;
+
+                    if (stockName != stockToCrawl) {
+                        continue;
+                    }
+
+                    thisStock = {
+                        ultima: elements[3].innerText,
+                        variacao: elements[4].innerText,
+                        abertura: elements[5].innerText,
+                        minima: elements[6].innerText,
+                        maxima: elements[7].innerText,
+                        fechamento: elements[8].innerText,
+                        volume: elements[9].innerText,
+                        preco_teorico: elements[12].innerText,
+                    };
+
+                    break;
+                }
+
+                return thisStock;
+
+            }, stockToCrawl);
+
+            stockData = findStock;
+
+            if (Object.keys(findStock).length > 0) {
+                break;
+            }
+            
+        }
+
+        if (Object.keys(stockData).length == 0) {
+            console.log(`> Não foi possível encontrar a ação em nenhum papel. Precisamos criar.`);
+        } else {
+            console.log(`> Ação encontrada! Dados abaixo:`);
+        }
+
+        stocks[stockToCrawl] = stockData;
+
+        console.log({[stockToCrawl]: stockData});
+        console.log(`===================================`);
+    }
+
+    await page.waitFor(30000);
+}
 
 
 function askQuestion(query) {
