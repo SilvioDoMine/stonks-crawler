@@ -211,7 +211,6 @@ async function crawlerLoop(page) {
             console.log(`> Vamos acessar a carteira ${j+1}/${portfolioIds.length}.`);
 
             await page.evaluate((portfolioId) => {
-                console.log(portfolioId);
                 document.getElementById(portfolioId).selected = true;
                 document.getElementById(`cboCarteira-ct1`).dispatchEvent(new Event('change'));
             }, portfolioIds[j]);
@@ -265,6 +264,98 @@ async function crawlerLoop(page) {
 
         if (Object.keys(stockData).length == 0) {
             console.log(`> Não foi possível encontrar a ação em nenhum papel. Precisamos criar.`);
+
+            // Vamos varrer e verificar se a última carteira já possui 20 ações.
+            // NOTA: Não precisamos ir para a última carteira, pois após o loop de pesquisa
+            // de ações, já estamos na última carteira.
+            let stockCount = await page.evaluate(function(){
+                let rows = document.querySelectorAll("#table-ct1 > tbody > tr");
+
+                return rows.length;
+            });
+
+            // Se tiver menos de 20 ações, podemos adicionar mais
+            if (stockCount != 0 && stockCount < 20) {
+                console.log(`> Só existem ${stockCount} ações na carteira ${portfolioIds.length}. Vamos adicionar nela.`);
+
+                // Inserindo papel na plataforma.
+                await page.evaluate(function(stockToCrawl){
+                    document.getElementById(`txtPapel-ct1`).value = stockToCrawl;
+                    document.getElementById('incPapel-ct1').click();
+                }, stockToCrawl);
+
+                console.log(`> Papel ${stockToCrawl} foi inserido na carteira ${portfolioIds.length}.`);
+                await page.waitFor(2000);
+
+                let findStock = await page.evaluate(function(stockToCrawl){
+                    let stockRow = document.getElementById(`${stockToCrawl}-ct1`);
+
+                    console.log(`${stockToCrawl}-ct1`);
+                    console.log(stockRow);
+
+                    let elements = stockRow.childNodes;
+
+                    return {
+                        ultima: elements[3].innerText,
+                        variacao: elements[4].innerText,
+                        abertura: elements[5].innerText,
+                        minima: elements[6].innerText,
+                        maxima: elements[7].innerText,
+                        fechamento: elements[8].innerText,
+                        volume: elements[9].innerText,
+                        preco_teorico: elements[12].innerText,
+                    };
+
+                    
+                }, stockToCrawl);
+
+                stockData = findStock;
+
+            } else {
+                console.log(`> Essa carteira já possui ${stockCount} de 20 ações. Precisamos criar outra carteira.`);
+
+                // Vamos inserir uma nova carteira no Homebroker
+                await page.evaluate(function(){
+                    document.getElementById('txtCarteira-ct1').value = Math.random().toString(36).substring(2);;
+                    document.getElementById('incCart-ct1').click();
+                });
+
+                await page.waitFor(2000);
+
+                // Inserindo papel na plataforma.
+                await page.evaluate(function(stockToCrawl){
+                    document.getElementById(`txtPapel-ct1`).value = stockToCrawl;
+                    document.getElementById('incPapel-ct1').click();
+                }, stockToCrawl);
+
+                console.log(`> Papel ${stockToCrawl} foi inserido na carteira ${portfolioIds.length}.`);
+                await page.waitFor(2000);
+
+                let findStock = await page.evaluate(function(stockToCrawl){
+                    let stockRow = document.getElementById(`${stockToCrawl}-ct1`);
+
+                    console.log(`${stockToCrawl}-ct1`);
+                    console.log(stockRow);
+
+                    let elements = stockRow.childNodes;
+
+                    return {
+                        ultima: elements[3].innerText,
+                        variacao: elements[4].innerText,
+                        abertura: elements[5].innerText,
+                        minima: elements[6].innerText,
+                        maxima: elements[7].innerText,
+                        fechamento: elements[8].innerText,
+                        volume: elements[9].innerText,
+                        preco_teorico: elements[12].innerText,
+                    };
+
+                    
+                }, stockToCrawl);
+
+                stockData = findStock;
+
+            }
         } else {
             console.log(`> Ação encontrada! Dados abaixo:`);
         }
@@ -275,9 +366,8 @@ async function crawlerLoop(page) {
         console.log(`===================================`);
     }
 
-    await page.waitFor(30000);
+    await page.waitFor(15000);
 }
-
 
 function askQuestion(query) {
     const rl = readline.createInterface({
