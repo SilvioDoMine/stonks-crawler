@@ -367,8 +367,6 @@ async function crawlerLoop(page) {
     }
 
     updateAllStocks();
-
-    await page.waitFor(15000);
 }
 
 function askQuestion(query) {
