@@ -1,7 +1,6 @@
 const readline = require('readline');
 const pupperteer = require('puppeteer');
 const mysql = require('mysql');
-const { exit } = require('process');
 let userStocks = [];
 // Lista global de ações, que o NodeJS tem acesso
 let stocks = {};
